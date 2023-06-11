@@ -1,68 +1,76 @@
 import {
   Table,
-  Thead,
   Tbody,
-  Tr,
-  Th,
-  Td,
   TableContainer,
   Box,
   Heading,
   Flex,
   Spinner,
-  Button,
-  Spacer,
-  Text,
   useToast,
+  Tr,
+  Td,
+  Spacer,
+  Button,
+  Input,
+  Container,
 } from '@chakra-ui/react'
-import { useEffect, useState } from 'react'
 import { deleteBranch, getAll } from '../../service/service'
-import { AddIcon, CloseIcon, RepeatIcon } from '@chakra-ui/icons'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
+import Thead from './TheadSection'
+import { useMutation, useQuery } from 'react-query'
+import { CheckIcon, CloseIcon, RepeatIcon } from '@chakra-ui/icons'
+import { useState } from 'react'
+import PaginationSetcion from '../PaginationSetcion'
 
 export default function DinamicTable() {
+  const [load, setLoad] = useState(true)
   const { slug } = useParams()
-  const [data, setData] = useState([])
-  const [isLoading, setIsLoading] = useState(false)
   const toast = useToast()
+  const { data, isLoading, refetch } = useQuery('getData', () =>
+    getAll({ slug }).then((res) => res.data)
+  )
+  //******************** Pagination */
+  const [currentPage, setCurrentPage] = useState(1)
+  const [search, setSearch] = useState([])
+  const [count, setCount] = useState(10)
+  const lastPostIndex = currentPage * count
+  const firstPostIndex = lastPostIndex - count
+  //******************** Pagination */
+  //******************** Search */
+  const { mutate: searchMutate } = useMutation(getAll, {
+    onSuccess: (res) => setSearch(res.data),
+  })
+  const state = search.length > 0 ? search : data
+  //******************** Search */
+  const keys = state?.length ? Object.keys(state[0]) : []
 
-  useEffect(() => {
-    setIsLoading(true)
-    getAll(slug)
-      .then((res) => setData(res.data))
-      .finally(() => setIsLoading(false))
-  }, [])
-
-  const keys = data?.length ? Object.keys(data[0]) : []
-
+  //******************** Functions  */
+  const deleteBranchMutate = useMutation(deleteBranch, {
+    onSuccess: () => {
+      toast({
+        title: `DELETED`,
+        colorScheme: 'red',
+        duration: 1500,
+      })
+      refetch()
+    },
+  })
   const deleteBranchFn = (id) => {
-    setIsLoading(true)
-    deleteBranch(slug, id).then((res) =>
-      getAll(slug)
-        .then((res) => setData(res.data))
-        .finally(() => {
-          setIsLoading(false)
-          toast({
-            title: 'Account created.',
-            render: () => (
-              <Box
-                color="white"
-                p={3}
-                bg="red.500"
-                borderRadius={'8px'}
-                textAlign={'center'}
-              >
-                DELETED!!!
-              </Box>
-            ),
-          })
-        })
-    )
+    deleteBranchMutate.mutate({ slug, id })
   }
+  const onSubmit = (e) => {
+    e.preventDefault()
+    const value = e.target['search'].value
+    searchMutate({ slug, value })
+  }
+  //******************** Functions  */
 
+  setTimeout(() => {
+    setLoad(false)
+  }, 700)
   return (
     <>
-      {isLoading ? (
+      {load ? (
         <Flex
           justifyContent={'center'}
           alignItems={'center'}
@@ -76,70 +84,85 @@ export default function DinamicTable() {
           <Spinner size="xl" color={'#fff'} />
         </Flex>
       ) : (
-        <Box p={'80px'}>
-          <TableContainer borderRadius={'10px'} boxShadow={'0 0 5px #a1a1a1'}>
-            <Table variant="striped" colorScheme="gray">
-              <Thead>
-                <Tr bg={'#CBD5E0'}>
-                  {keys.map((key, i) => (
-                    <Th key={i} color={'#000'}>
-                      {key}
-                    </Th>
-                  ))}
-                  <Th color={'#000'} p={'10px 24px'}>
-                    <Flex alignItems={'center'}>
-                      <Text>Actions</Text>
-                      <Spacer />
-                      <Button
-                        color={'#EBF8FF'}
-                        bg={'#1A365D'}
-                        _hover={{ color: '#1A365D', background: '#EBF8FF' }}
-                        alignItems={'center'}
-                        gap={'5px'}
-                      >
-                        <AddIcon />
-                        ADD
-                      </Button>
-                    </Flex>
-                  </Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {data.map((element) => (
-                  <Tr key={element.id}>
-                    {keys.map((key, i) => (
-                      <Td key={i}>{element[key]}</Td>
+        <>
+          <Box w={'100%'} p={'30px 0'}>
+            <Container maxW={'1296px'}>
+              <form onSubmit={(e) => onSubmit(e)}>
+                <Flex>
+                  <Input name="search" borderRightRadius={'none'} />
+                  <Button
+                    colorScheme="blue"
+                    borderLeftRadius={'none'}
+                    type="submit"
+                  >
+                    Search
+                  </Button>
+                </Flex>
+              </form>
+            </Container>
+          </Box>
+          <Box p={'0 80px'}>
+            <TableContainer borderRadius={'10px'} boxShadow={'0 0 5px #a1a1a1'}>
+              <Table variant="striped" colorScheme="gray">
+                <Thead keys={keys} />
+                <Tbody>
+                  {state
+                    ?.slice(firstPostIndex, lastPostIndex)
+                    .map((element) => (
+                      <Tr key={element.id}>
+                        {keys.map((key, i) => (
+                          <Td key={i}>
+                            {[key] == 'status' ? (
+                              element[key] ? (
+                                <CheckIcon />
+                              ) : (
+                                <></>
+                              )
+                            ) : (
+                              element[key]
+                            )}
+                          </Td>
+                        ))}
+                        <Td p={'0'}>
+                          <Flex alignItems={'center'}>
+                            <Spacer />
+                            <Link to={`/${slug}/update/${element.id}`}>
+                              <Button
+                                colorScheme="blue"
+                                alignItems={'center'}
+                                gap={'5px'}
+                              >
+                                <RepeatIcon />
+                                Update
+                              </Button>
+                            </Link>
+                            <Spacer />
+                            <Button
+                              onClick={() => deleteBranchFn(element.id)}
+                              colorScheme="red"
+                              alignItems={'center'}
+                              gap={'5px'}
+                            >
+                              <CloseIcon />
+                              Delete
+                            </Button>
+                            <Spacer />
+                          </Flex>
+                        </Td>
+                      </Tr>
                     ))}
-                    <Td p={'0'}>
-                      <Flex alignItems={'center'}>
-                        <Spacer />
-                        <Button
-                          colorScheme="blue"
-                          alignItems={'center'}
-                          gap={'5px'}
-                        >
-                          <RepeatIcon />
-                          Update
-                        </Button>
-                        <Spacer />
-                        <Button
-                          onClick={() => deleteBranchFn(element.id)}
-                          colorScheme="red"
-                          alignItems={'center'}
-                          gap={'5px'}
-                        >
-                          <CloseIcon />
-                          Delete
-                        </Button>
-                        <Spacer />
-                      </Flex>
-                    </Td>
-                  </Tr>
-                ))}
-              </Tbody>
-            </Table>
-          </TableContainer>
-        </Box>
+                </Tbody>
+              </Table>
+              <PaginationSetcion
+                totalTodos={data?.length}
+                count={count}
+                setCurrentPage={setCurrentPage}
+                setCount={setCount}
+                currentPage={currentPage}
+              />
+            </TableContainer>
+          </Box>
+        </>
       )}
     </>
   )

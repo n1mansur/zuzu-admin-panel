@@ -1,0 +1,8 @@
+@import './styles/_nullStyle.scss';
+@import './styles/_mixins.scss';
+
+button.active {
+  background: #909090;
+  color: #fff;
+  box-shadow: 0 0 5px #000;
+}
